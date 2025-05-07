@@ -1,0 +1,294 @@
+#!/usr/bin/env python3
+import rclpy
+from rclpy.node import Node
+from std_msgs.msg import String, Int32
+from diff_drive_msgs.msg import WheelCommand
+import sys
+import termios
+import tty
+import select
+import os
+import can
+import time
+import pygame
+def get_key():
+    """Get a single keypress from stdin without echoing to terminal."""
+    # Disable echo
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        # Add ECHO flag to disable character echo
+        new_settings = termios.tcgetattr(fd)
+        new_settings[3] = new_settings[3] & ~termios.ECHO
+        termios.tcsetattr(fd, termios.TCSADRAIN, new_settings)
+        
+        rlist, _, _ = select.select([sys.stdin], [], [], 0.1)
+        if rlist:
+            key = sys.stdin.read(1)
+        else:
+            key = ''
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+    return key
+
+class KeyTeleopNode(Node):
+    def __init__(self):
+        super().__init__('key_teleop')
+        self.wheel_pub = self.create_publisher(WheelCommand, 'wheel_cmd', 1)
+        self.timer = self.create_timer(0.1, self.timer_callback)
+        self.get_logger().info('Key Teleop Node has been started')
+        
+        # Can bus for arm
+        self.r_bus = can.ThreadSafeBus(interface='socketcan', channel="can2", bitrate=1000000)
+        self.l_bus = can.ThreadSafeBus(interface='socketcan', channel="can1", bitrate=1000000)
+        # 状态变量
+        self.current_linear_speed = 0.0
+        self.current_angular_speed = 0.0
+        self.speed = 150.0
+        self.is_moving = False
+
+        reply = self.position_ctrl([18,19],self.l_bus,[0.0, 0.0],[10.0,10.0])
+
+
+        
+        # 按键映射
+        self.key_mapping = {
+            'r': 'Increase',
+            'f': 'Decrease',
+            'w': 'FORWARD',
+            's': 'BACKWARD',
+            'a': 'LEFT',
+            'd': 'RIGHT',
+            'q': 'QUIT',
+            'z': 'ZERO',
+            'h': 'HELLO',
+            'i': 'IDLE',
+            'l': 'WAVE',
+            'v': 'VOICE'
+        }
+        
+        # 打印键盘控制说明
+        self.print_help()
+
+    def send_msg(self,bus,motor,cmd,reply_flag):
+        msg = can.Message(arbitration_id=motor+320, data = cmd, is_extended_id=False)
+        bus.send(msg)
+        recv_msg = None
+        if reply_flag:
+            for i in range(10):
+                _msg = bus.recv(timeout=0.01)
+                if not _msg is None:
+                    if _msg.arbitration_id == motor + 576:
+                        recv_msg = _msg
+                        break
+        else:
+            recv_msg = None
+        return(recv_msg)
+
+    def motor_shaft_pos(self,motors,bus):
+        position = []
+        for i in range(len(motors)):
+            _cmd_ = [0x00]*8
+            _cmd_[0] = 0x92
+            recv = self.send_msg(bus,motors[i],_cmd_,True)
+            if not recv == None:
+                pos = int.from_bytes(recv.data[4:],"little",signed=True)
+                pos = pos/100# gear ratio is 100
+            else:
+                pos = None
+            position.append(pos)
+        return position
+
+    
+    def generate_speed(self,start_pos, end_pos, max_speed):
+
+        dist = [0]*len(start_pos)
+
+        # get max distance
+        for i in range(len(start_pos)):
+            dist[i] = abs(end_pos[i] - start_pos[i])
+
+        max_dist = max(dist)
+        speeds = []
+
+        # get speeds of each motor
+        for _dist_ in dist:
+            speed = (_dist_/max_dist) * max_speed
+            speeds.append(speed)
+
+        return speeds
+
+    def position_ctrl(self,motors,bus,pos,speed):
+        reply = []
+        data = None
+        for i in range(len(motors)):
+            l,m,n,o = int(100*pos[i]).to_bytes(4,"little",signed=True)
+            sl,sh = int(speed[i]).to_bytes(2,"little",signed=True)
+            _cmd_ = [0xA4,0x00,sl,sh,l,m,n,o]
+            recv = self.send_msg(bus,motors[i],_cmd_,True)
+            if (not recv == None):
+                # print(recv)
+                temp = int(recv.data[1])
+                I = (int.from_bytes(recv.data[2:4],"little"))*0.01 # conversion factor related to the gear ratio of 100
+                vel = int.from_bytes(recv.data[4:6],"little",signed=True)
+                _pos_ = int.from_bytes(recv.data[6:8],"little",signed=True)
+                data = [temp,I,vel,_pos_]
+                # print("pos is : ",_pos_)
+                # print("Temp is : ", temp)
+                # print("Vel is : ",vel)
+                # print("Current is : ",I)
+            reply.append(data)
+        return reply
+    
+    def print_help(self):
+        """打印键盘控制说明"""
+        print("\n==== 轮子控制键盘节点 ====")
+        print("移动控制:")
+        print("  w/s - 前进/后退 (按键后保持)")
+        print("  a/d - 左转/右转 (按键后保持)")
+        print("  r/f - 增加/减少速度")
+        print("  z   - 急停")
+        print("  q   - 退出程序")
+        print("  h   - hello  ")
+        print("  i   - idle  ")
+        print("  l   - wave  ")
+        print("  v   - voice  ")
+        print("========================\n")
+        
+    def timer_callback(self):
+        key = get_key()
+        wheels_msg = WheelCommand()
+        
+        if key in self.key_mapping:
+            if key == 'r':
+                self.speed += 10.0
+                print(f"速度设置为: {self.speed} dps")
+            elif key == 'f':
+                self.speed = max(10.0, self.speed - 1.0)  # 确保速度不小于1
+                print(f"速度设置为: {self.speed} dps")
+            elif key == 'w':
+                self.current_linear_speed = self.speed
+                self.current_angular_speed = 0.0
+                self.is_moving = True
+                print(f"前进: {self.speed} dps")
+            elif key == 's':
+                self.current_linear_speed = -self.speed
+                self.current_angular_speed = 0.0
+                self.is_moving = True
+                print(f"后退: {self.speed} dps")
+            elif key == 'a':
+                self.current_linear_speed = 0.0
+                self.current_angular_speed = (self.speed / 2)
+                self.is_moving = True
+                print(f"左转: {self.speed} dps")
+            elif key == 'd':
+                self.current_linear_speed = 0.0
+                self.current_angular_speed = -(self.speed / 2)
+                self.is_moving = True
+                print(f"右转: {self.speed} dps")
+            elif key == 'z':
+                # 急停
+                self.current_linear_speed = 0.0
+                self.current_angular_speed = 0.0
+                self.is_moving = False
+                print("停止")
+            elif key == 'q':
+                print("退出程序...")
+                rclpy.shutdown()
+                exit()
+            elif key == 'h':
+                print("hello")
+                id = [7,8,9,10,11,12]
+                pos = [0,50,-90,85,0,0]
+                arr_len = len(id)
+                prev_pos =  self.motor_shaft_pos(id,self.r_bus)
+                speeds = self.generate_speed(prev_pos, pos, 45)
+                reply = self.position_ctrl(id,self.r_bus,pos,speeds)
+                # time.sleep(3)
+                # pos = [0,0,0,0,0,0]
+                # arr_len = len(id)
+                # reply = self.position_ctrl(id,self.r_bus,pos,speeds)
+            elif key == 'v':
+                pygame.mixer.init()
+    # 加载要播放的音频文件
+                pygame.mixer.music.load("自我介绍长.mp3")
+    # 播放音频
+                pygame.mixer.music.play()
+    # 等待播放结束（非阻塞版本：每隔短时间检测是否播放完）
+                while pygame.mixer.music.get_busy():
+                    pygame.time.Clock().tick(10)
+    # 关闭混音器
+                pygame.mixer.quit()
+
+            elif key == 'i':
+                print("idle")
+                id = [7,8,9,10,11,12]
+                prev_pos =  self.motor_shaft_pos(id,self.r_bus)
+                pos = [0,0,0,0,0,0]
+                arr_len = len(id)
+                speeds = self.generate_speed(prev_pos, pos, 45)
+                reply = self.position_ctrl(id,self.r_bus,pos,speeds)
+            elif key == 'l':
+                print("wave")
+                id = [7,8,9,10,11,12]
+                prev_pos =  self.motor_shaft_pos(id,self.r_bus)
+                pos = [0,90,-90,85,0,0]
+                arr_len = len(id)
+                speeds = self.generate_speed(prev_pos, pos, 45)
+                reply = self.position_ctrl(id,self.r_bus,pos,speeds)
+                time.sleep(2)
+                prev_pos =  self.motor_shaft_pos(id,self.r_bus)
+                pos = [0,90,-90,65,0,0]
+                arr_len = len(id)
+                speeds = self.generate_speed(prev_pos, pos, 45)
+                reply = self.position_ctrl(id,self.r_bus,pos,speeds)
+                time.sleep(1)
+                prev_pos =  self.motor_shaft_pos(id,self.r_bus)
+                pos = [0,90,-90,85,0,0]
+                arr_len = len(id)
+                speeds = self.generate_speed(prev_pos, pos, 45)
+                reply = self.position_ctrl(id,self.r_bus,pos,speeds)
+                time.sleep(1)
+                prev_pos =  self.motor_shaft_pos(id,self.r_bus)
+                pos = [0,90,-90,65,0,0]
+                arr_len = len(id)
+                speeds = self.generate_speed(prev_pos, pos, 45)
+                reply = self.position_ctrl(id,self.r_bus,pos,speeds)
+                time.sleep(1)
+                prev_pos =  self.motor_shaft_pos(id,self.r_bus)
+                pos = [0,0,0,0,0,0]
+                arr_len = len(id)
+                speeds = self.generate_speed(prev_pos, pos, 45)
+                reply = self.position_ctrl(id,self.r_bus,pos,speeds)
+
+
+        # 根据当前状态发布速度消息
+        if self.is_moving:
+            if self.current_angular_speed != 0:
+                wheels_msg.left_wheel_velocity = float(self.current_angular_speed)
+                wheels_msg.right_wheel_velocity = float(self.current_angular_speed)  
+            elif self.current_linear_speed != 0:
+                wheels_msg.left_wheel_velocity = float(-self.current_linear_speed)
+                wheels_msg.right_wheel_velocity = float(self.current_linear_speed)
+        else:
+            wheels_msg.left_wheel_velocity = 0.0
+            wheels_msg.right_wheel_velocity = 0.0
+        
+        self.wheel_pub.publish(wheels_msg)
+            
+def main(args=None):
+    rclpy.init(args=args)
+    
+    try:
+        key_teleop_node = KeyTeleopNode()
+        rclpy.spin(key_teleop_node)
+    except Exception as e:
+        print(f"错误: {e}")
+    finally:
+        # 恢复终端设置
+        fd = sys.stdin.fileno()
+        termios.tcsetattr(fd, termios.TCSADRAIN, termios.tcgetattr(fd))
+
+if __name__ == '__main__':
+    main()

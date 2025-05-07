@@ -1,0 +1,51 @@
+Visualization Manager:
+  Class: rviz2_common/ViewManager
+  Displays:
+    - Class: rviz_common/Grid
+      Name: Grid
+      Value: true
+      Color: 160; 160; 164
+      Cell Size: 0.1
+      Plane Cell Count: 10
+      Reference Frame: <Fixed Frame>
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: true
+      Frame Timeout: 15
+      Show Arrows: true
+      Show Axes: true
+    - Class: rviz_default_plugins/RobotModel
+      Name: RobotModel
+      Description Topic: /robot_description
+      Enabled: true
+      Visual Enabled: true
+      Collision Enabled: false
+      Update Interval: 0
+    - Class: rviz_default_plugins/LaserScan
+      Name: LaserScan
+      Topic: /scan
+      Enabled: true
+      Unreliable: false
+      Queue Size: 100  # Increased queue size
+      Visualization parameters:
+        Style: Points
+        Size: 0.03
+        Color: 255; 0; 0
+        Alpha: 1.0
+      Buffer Length: 1
+      Decay Time: 0
+  Global Options:
+    Fixed Frame: world
+    Frame Rate: 30
+  Tools:
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/Measure
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Target Frame: base_link
+      Distance: 1.5
+      Pitch: 0.5
+      Yaw: 0.7
