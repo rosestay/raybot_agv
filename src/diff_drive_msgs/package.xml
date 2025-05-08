@@ -12,6 +12,8 @@
 
   <depend>builtin_interfaces</depend>
   <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>  <!-- 添加geometry_msgs依赖 -->
+  <depend>action_msgs</depend>    <!-- 添加action_msgs依赖 -->
 
   <exec_depend>rosidl_default_runtime</exec_depend>
 

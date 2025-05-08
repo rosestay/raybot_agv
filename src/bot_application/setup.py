@@ -12,8 +12,8 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        # 添加launch文件
         (os.path.join('share', package_name, 'launch'), glob('launch/*.py')),
+        (os.path.join('share', package_name, 'action'), glob('action/*.action')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -28,6 +28,7 @@ setup(
             "get_robot_pose=bot_application.get_robot_pose:main",
             "nav_to_pose=bot_application.nav_to_pose:main",
             "waypoint_flollower=bot_application.waypoint_flollower:main",
+            "nav_to_point_client=bot_application.nav_to_point_client:main",
         ],
     },
 )

@@ -1,0 +1,21 @@
+# NavigateToPoint.action
+
+# 请求字段 - 目标
+int32 point_id    # 导航点位的ID
+
+---
+# 结果字段 - 完成后返回
+bool success      # 导航是否成功
+string message    # 结果描述或错误信息
+
+---
+# 反馈字段 - 周期性更新
+float32 distance_remaining   # 剩余距离（米）
+float64 navigation_time      # 导航已用时间（秒）
+geometry_msgs/PoseStamped current_pose  # 当前姿态
+
+
+#NavigateToPoint.Goal
+#NavigateToPoint.Result
+#NavigateToPoint.Feedback
+#from bot_application.action import NavigateToPoint
