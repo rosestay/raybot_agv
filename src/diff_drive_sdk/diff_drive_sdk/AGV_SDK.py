@@ -246,6 +246,12 @@ _client = None
 _executor = None
 _initialized = False
 
+def get_executor():
+    global _executor
+
+    return _executor
+
+
 def init(initialized_ros=False):
     """Initialize SDK
     
@@ -261,12 +267,7 @@ def init(initialized_ros=False):
         
         _client = DiffDriveRobotClient()
         _executor = MultiThreadedExecutor()
-        _executor.add_node(_client)
-        
-        # Start executor thread
-        thread = threading.Thread(target=_executor.spin, daemon=True)
-        thread.start()
-        
+       
         print("Differential Drive Robot SDK initialized")
         _initialized = True
     
@@ -298,12 +299,12 @@ def shutdown():
 
 
 # Simple API wrapper functions
-def move_forward(speed=0.3):
+def move_forward(speed=10.0):
     """Move forward"""
     client = get_client()
     client.publish_velocity(speed, 0.0)
 
-def move_backward(speed=0.3):
+def move_backward(speed=10.0):
     """Move backward"""
     client = get_client()
     client.publish_velocity(-speed, 0.0)
