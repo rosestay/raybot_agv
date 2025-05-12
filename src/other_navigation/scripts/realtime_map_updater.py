@@ -14,7 +14,7 @@ class RealtimeMapUpdater(Node):
         super().__init__('realtime_map_updater')
         
         # 参数
-        self.declare_parameter('update_threshold', 0.10)  # 5%的变化触发更新
+        self.declare_parameter('update_threshold', 0.10)  
         self.declare_parameter('min_update_interval', 1.0)  # 最小更新间隔
         
         self.update_threshold = self.get_parameter('update_threshold').value
