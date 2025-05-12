@@ -45,7 +45,7 @@ class KeyTeleopNode(Node):
         # 状态变量
         self.current_linear_speed = 0.0
         self.current_angular_speed = 0.0
-        self.speed = 150.0
+        self.speed = 60.0
         self.is_moving = False
 
         reply = self.position_ctrl([18,19],self.l_bus,[0.0, 0.0],[10.0,10.0])

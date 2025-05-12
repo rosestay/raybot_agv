@@ -60,8 +60,6 @@ class DiffDriveRobotClient(Node):
             'left_velocity': 0.0,
             'right_position': 0.0,
             'right_velocity': 0.0,
-            'left_multiturn': 0.0,
-            'right_multiturn': 0.0
         }
         self._lock = threading.Lock()
         
@@ -93,8 +91,6 @@ class DiffDriveRobotClient(Node):
             self._wheel_feedback['left_velocity'] = msg.left_wheel_velocity
             self._wheel_feedback['right_position'] = msg.right_wheel_position
             self._wheel_feedback['right_velocity'] = msg.right_wheel_velocity
-            self._wheel_feedback['left_multiturn'] = msg.left_wheel_multiturn_position
-            self._wheel_feedback['right_multiturn'] = msg.right_wheel_multiturn_position
     
     def _quaternion_to_yaw(self, q):
         """Convert quaternion to yaw angle (radians)"""
@@ -299,12 +295,12 @@ def shutdown():
 
 
 # Simple API wrapper functions
-def move_forward(speed=10.0):
+def move_forward(speed=0.5):
     """Move forward"""
     client = get_client()
     client.publish_velocity(speed, 0.0)
 
-def move_backward(speed=10.0):
+def move_backward(speed=0.5):
     """Move backward"""
     client = get_client()
     client.publish_velocity(-speed, 0.0)

@@ -5,7 +5,7 @@ from rclpy.node import Node
 from rclpy.duration import Duration
 from diff_drive_msgs.msg import Feedback
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Point, Pose, Quaternion, TransformStamped
+from geometry_msgs.msg import Point, Pose, Quaternion, TransformStamped, Vector3, Twist
 import tf2_ros
 import numpy as np
 
@@ -18,12 +18,14 @@ class WheelOdometryWithTF(Node):
         self.declare_parameter('wheel_base', 0.5)  # distance between wheels in meters
         self.declare_parameter('odom_frame', 'odom')
         self.declare_parameter('base_frame', 'base_footprint')
+        self.declare_parameter('rotation_correction', 1.5)  # 新增: 旋转修正因子参数
         
         # Get parameters
         self.wheel_diameter = self.get_parameter('wheel_diameter').value
         self.wheel_base = self.get_parameter('wheel_base').value
         self.odom_frame = self.get_parameter('odom_frame').value
         self.base_frame = self.get_parameter('base_frame').value
+        self.rotation_correction = self.get_parameter('rotation_correction').value  # 获取旋转修正因子
         
         self.wheel_radius = self.wheel_diameter / 2.0
         
@@ -35,6 +37,7 @@ class WheelOdometryWithTF(Node):
         # Previous wheel positions and timestamp
         self.prev_left_position = None
         self.prev_right_position = None
+        self.prev_timestamp = None
         
         # TF2 Broadcaster
         self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
@@ -52,7 +55,7 @@ class WheelOdometryWithTF(Node):
         
         self.get_logger().info(f'Wheel Odometry Node Initialized')
         self.get_logger().info(f'Odom Frame: {self.odom_frame}, Base Frame: {self.base_frame}')
-        
+        self.get_logger().info(f'Rotation Correction Factor: {self.rotation_correction}')
     
     def normalize_angle(self, angle):
         """Normalize angle to [0, 2π) range."""
@@ -101,30 +104,47 @@ class WheelOdometryWithTF(Node):
     def odometry_callback(self, msg):
         # Get current timestamp
         current_timestamp = self.get_clock().now().to_msg()
+        current_time = self.get_clock().now()
         
-        left_position = msg.left_wheel_multiturn_position
-        right_position = msg.right_wheel_multiturn_position
+        left_position = msg.left_wheel_position
+        right_position = msg.right_wheel_position
         
         # Skip first iteration
         if (self.prev_left_position is None) or (self.prev_right_position is None):
             self.prev_left_position = left_position
             self.prev_right_position = right_position
+            self.prev_timestamp = current_time
             return
         
+        # 计算时间差
+        dt = (current_time - self.prev_timestamp).nanoseconds / 1e9  # 转换为秒
+        if dt <= 0:
+            return
         
         # Calculate angular displacements
         # Correct for wheel rotation direction
         delta_left = self.prev_left_position - left_position  # Reversed for forward motion
         delta_right = right_position - self.prev_right_position
 
-        # Calculate linear displacements
-        delta_s_left = delta_left * self.wheel_radius * 3.1415926 / 180
-        delta_s_right = delta_right * self.wheel_radius * 3.1415926  / 180
+        # Calculate linear displacements - 使用标准数学库常量
+        delta_s_left = delta_left * self.wheel_radius * math.pi / 180.0  # 使用math.pi并保证精度
+        delta_s_right = delta_right * self.wheel_radius * math.pi / 180.0  # 统一精度
         
         # Calculate average linear displacement and angular displacement
         # Positive rotation is counter-clockwise
         delta_s = (delta_s_left + delta_s_right) / 2.0
-        delta_theta = (delta_s_right - delta_s_left) / self.wheel_base
+        
+        # 修改: 使用1.5的修正因子 - 这是根据反馈调整的值
+        delta_theta = (delta_s_right - delta_s_left) / self.wheel_base * self.rotation_correction
+        
+        # 计算实际的轮距 - 用于调试
+        if abs(delta_s_right - delta_s_left) > 0.001 and abs(delta_theta) > 0.001:
+            actual_wheel_base = abs(delta_s_right - delta_s_left) / (abs(delta_theta) / self.rotation_correction)
+            self.get_logger().debug(f'Measured wheel_base: {actual_wheel_base:.4f}m vs configured: {self.wheel_base:.4f}m')
+        
+        # 计算线速度和角速度
+        v_x = delta_s / dt  # 前向线速度
+        v_theta = delta_theta / dt  # 角速度
         
         # Small angle approximation for pose update
         if abs(delta_theta) < 1e-6:
@@ -159,21 +179,29 @@ class WheelOdometryWithTF(Node):
             z=quaternion[2], w=quaternion[3]
         )
         
+        # 添加速度信息 - EKF融合需要
+        # 在机器人坐标系中的线速度和角速度
+        odom.twist.twist = Twist(
+            linear=Vector3(x=float(v_x), y=0.0, z=0.0),
+            angular=Vector3(x=0.0, y=0.0, z=float(v_theta))
+        )
+        
         # Publish odometry
         self.odometry_publisher.publish(odom)
         
         # Publish TF transform
         self.publish_tf_transform(current_timestamp)
         
-        # Update previous wheel positions
+        # Update previous wheel positions and timestamp
         self.prev_left_position = left_position
         self.prev_right_position = right_position
+        self.prev_timestamp = current_time
         
-        # Log current pose
+        # Log current pose and wheel angles
         self.get_logger().info(
-            f'Odometry - x: {self.x:.3f}, y: {self.y:.3f}, theta: {math.degrees(self.theta):.3f}°'
-            f'21 angle: {left_position:.3f}, 22 angle : {right_position:.3f}'
-            
+            f'Odometry - x: {self.x:.3f}, y: {self.y:.3f}, theta: {math.degrees(self.theta):.3f}°, '
+            f'v_x: {v_x:.3f}, v_theta: {math.degrees(v_theta):.3f}°/s, '
+            f'L: {left_position:.1f}, R: {right_position:.1f}, dL: {delta_left:.1f}, dR: {delta_right:.1f}'
         )
 
 def main(args=None):

@@ -22,6 +22,9 @@
   <depend>tf2_geometry_msgs</depend>
   <!-- 添加自定义消息包依赖 -->
   <depend>diff_drive_msgs</depend>
+  <!-- 添加EKF融合所需依赖 -->
+  <depend>robot_localization</depend>
+  <depend>nav_msgs</depend>
   
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

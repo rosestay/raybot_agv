@@ -13,8 +13,9 @@ setup(
         (os.path.join('share', package_name, 'launch'), glob('launch/*.py')),
         (os.path.join('share', package_name, 'urdf'), glob('urdf/*.urdf')),
         (os.path.join('share', package_name, 'meshes'), glob('meshes/*')),
-   
         (os.path.join('share', package_name, 'scripts'), glob('scripts/*.sh')),
+        # 添加config目录
+        (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

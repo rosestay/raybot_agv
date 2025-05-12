@@ -45,6 +45,7 @@ class DiffDriveHardwareInterface(Node):
     
     def control_wheel_speeds(self, speeds):
         vel = []
+        pos = []
         """通过CAN总线向轮子电机发送速度命令"""
         for i in range(len(self.wheel_motors)):
             # 将速度值转换为控制器需要的格式（乘以100，转换为小端4字节整数）
@@ -66,35 +67,40 @@ class DiffDriveHardwareInterface(Node):
                 if _response is None:
                     self.get_logger().warning(f"No response from motor {self.wheel_motors[i]}")
                     vel.append(None)
+                    pos.append(None)
                 else:
                     _vel_ = int.from_bytes(_response.data[4:6],"little",signed=True)
-                    vel.append(_vel_)                     
+                    _pos_ = float(int.from_bytes(_response.data[6:8],"little",signed=True))
+                    vel.append(_vel_)
+                    pos.append(_pos_)                     
             except Exception as e:
                 self.get_logger().error(f"Error sending command to motor {self.wheel_motors[i]}: {e}")  
-        return vel
+        return vel,pos
     
     def speed_ctrl_loop(self):
 
         if self.speeds:
             print("Speed", self.speeds)
-            vel = self.control_wheel_speeds(self.speeds)
+            vel,pos = self.control_wheel_speeds(self.speeds)
             self.speeds = []
         else:
-            vel = self.control_wheel_speeds([0.0,0.0])
+            vel,pos = self.control_wheel_speeds([0.0,0.0])
             print("Stopping")
 
-        if not None in vel:
+        if (not None in vel) and (not None in pos) :
             self.feedback_speed = vel
+            self.feedback_pos = pos
             print(vel)
+            print(pos)
         else:
             pass
         
-        pos = self.get_multiturn_data(self.wheel_motors)
+        # pos = self.get_multiturn_data(self.wheel_motors)
 
-        if not None in pos:
-            self.feedback_pos = pos
-        else:
-            pass
+        # if not None in pos:
+        #     self.feedback_pos = pos
+        # else:
+        #     pass
 
 
 
@@ -111,14 +117,14 @@ class DiffDriveHardwareInterface(Node):
         # right_multiturn = self.get_multiturn_data(self.wheel_motors[1])
         
         # 填充反馈消息
-        # feedback.left_wheel_position = float(self.feedback_pos[0])
+        feedback.left_wheel_position = float(self.feedback_pos[0])
         feedback.left_wheel_velocity = float(self.feedback_speed[0])
-        # feedback.right_wheel_position = float(self.feedback_pos[1])
+        feedback.right_wheel_position = float(self.feedback_pos[1])
         feedback.right_wheel_velocity = float(self.feedback_speed[1])
         
         # 添加多圈位置数据 
-        feedback.left_wheel_multiturn_position = (self.feedback_pos[0])  
-        feedback.right_wheel_multiturn_position = (self.feedback_pos[1]) 
+        # feedback.left_wheel_multiturn_position = (self.feedback_pos[0])  
+        # feedback.right_wheel_multiturn_position = (self.feedback_pos[1]) 
         
         feedback.timestamp = self.get_clock().now().to_msg()
         

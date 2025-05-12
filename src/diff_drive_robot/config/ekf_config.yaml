@@ -1,0 +1,83 @@
+ekf_filter_node:
+  ros__parameters:
+    # 基本设置
+    frequency: 30.0                # 滤波器更新频率(Hz)
+    sensor_timeout: 0.1            # 传感器数据超时时间(秒)
+    two_d_mode: true               # 2D模式(禁用Z、roll和pitch)
+    publish_tf: true               # 发布TF变换
+    publish_acceleration: false    # 不发布加速度
+    reset_on_time_jump: true       # 时间跳跃时重置
+    
+    # 坐标系配置
+    map_frame: map                 # 地图坐标系
+    odom_frame: odom               # 里程计坐标系
+    base_link_frame: base_footprint # 机器人基础坐标系
+    world_frame: odom              # 发布位姿的参考坐标系
+    
+    # 轮式里程计配置
+    odom0: /odom                   # 轮式里程计话题
+    odom0_config: [true, true, false,  # x, y, z位置
+                  false, false, true,  # roll, pitch, yaw方向
+                  false, false, false, # x, y, z速度
+                  false, false, false, # roll, pitch, yaw角速度
+                  false, false, false] # x, y, z加速度
+    
+    # 轮式里程计高级设置
+    odom0_differential: false      # 非差分模式
+    odom0_relative: false          # 非相对测量
+    odom0_queue_size: 10           # 消息队列大小
+    odom0_nodelay: true            # 禁用消息缓存以减少延迟
+    odom0_pose_rejection_threshold: 2.0  # 位姿拒绝阈值 - 降低以过滤异常值
+    odom0_twist_rejection_threshold: 0.5 # 速度拒绝阈值
+                  
+    # IMU配置
+    imu0: /imu/data_raw                # IMU话题
+    imu0_config: [false, false, false, # x, y, z位置(IMU不提供)
+                 false, false, true,   # roll, pitch, yaw方向(仅使用yaw)
+                 false, false, false,  # x, y, z速度(IMU不提供)
+                 false, false, true,   # roll, pitch, yaw角速度(仅使用yaw)
+                 true, false, false]   # x加速度(仅在前进方向)
+    
+    # IMU高级设置
+    imu0_differential: false       # 非差分模式
+    imu0_relative: false           # 非相对测量
+    imu0_queue_size: 10            # 消息队列大小
+    imu0_nodelay: true             # 禁用消息缓存以减少延迟
+    imu0_pose_rejection_threshold: 3.0  # 位姿拒绝阈值 - 对IMU更宽容
+    imu0_twist_rejection_threshold: 0.8 # 速度拒绝阈值
+    imu0_remove_gravitational_acceleration: true  # 去除重力加速度
+    imu0_angular_velocity_rejection_threshold: 0.2  # 过滤小的角速度噪声
+    
+    # 修改过程噪声协方差 - 降低值使滤波器更"平滑"
+    process_noise_covariance: [0.01, 0,    0,    0,    0,    0,    0,     0,     0,    0,    0,    0,    0,    0,    0,
+                               0,    0.01, 0,    0,    0,    0,    0,     0,     0,    0,    0,    0,    0,    0,    0,
+                               0,    0,    0.06, 0,    0,    0,    0,     0,     0,    0,    0,    0,    0,    0,    0,
+                               0,    0,    0,    0.03, 0,    0,    0,     0,     0,    0,    0,    0,    0,    0,    0,
+                               0,    0,    0,    0,    0.03, 0,    0,     0,     0,    0,    0,    0,    0,    0,    0,
+                               0,    0,    0,    0,    0,    0.02, 0,     0,     0,    0,    0,    0,    0,    0,    0,
+                               0,    0,    0,    0,    0,    0,    0.025, 0,     0,    0,    0,    0,    0,    0,    0,
+                               0,    0,    0,    0,    0,    0,    0,     0.025, 0,    0,    0,    0,    0,    0,    0,
+                               0,    0,    0,    0,    0,    0,    0,     0,     0.04, 0,    0,    0,    0,    0,    0,
+                               0,    0,    0,    0,    0,    0,    0,     0,     0,    0.01, 0,    0,    0,    0,    0,
+                               0,    0,    0,    0,    0,    0,    0,     0,     0,    0,    0.01, 0,    0,    0,    0,
+                               0,    0,    0,    0,    0,    0,    0,     0,     0,    0,    0,    0.01, 0,    0,    0,
+                               0,    0,    0,    0,    0,    0,    0,     0,     0,    0,    0,    0,    0.01, 0,    0,
+                               0,    0,    0,    0,    0,    0,    0,     0,     0,    0,    0,    0,    0,    0.01, 0,
+                               0,    0,    0,    0,    0,    0,    0,     0,     0,    0,    0,    0,    0,    0,    0.01]
+                             
+    # 初始状态估计协方差 - 降低以减少初始波动
+    initial_estimate_covariance: [1e-9, 0,    0,    0,    0,    0,    0,    0,    0,    0,     0,     0,     0,    0,    0,
+                                  0,    1e-9, 0,    0,    0,    0,    0,    0,    0,    0,     0,     0,     0,    0,    0,
+                                  0,    0,    1e-9, 0,    0,    0,    0,    0,    0,    0,     0,     0,     0,    0,    0,
+                                  0,    0,    0,    1e-9, 0,    0,    0,    0,    0,    0,     0,     0,     0,    0,    0,
+                                  0,    0,    0,    0,    1e-9, 0,    0,    0,    0,    0,     0,     0,     0,    0,    0,
+                                  0,    0,    0,    0,    0,    1e-9, 0,    0,    0,    0,     0,     0,     0,    0,    0,
+                                  0,    0,    0,    0,    0,    0,    1e-9, 0,    0,    0,     0,     0,     0,    0,    0,
+                                  0,    0,    0,    0,    0,    0,    0,    1e-9, 0,    0,     0,     0,     0,    0,    0,
+                                  0,    0,    0,    0,    0,    0,    0,    0,    1e-9, 0,     0,     0,     0,    0,    0,
+                                  0,    0,    0,    0,    0,    0,    0,    0,    0,    1e-9,  0,     0,     0,    0,    0,
+                                  0,    0,    0,    0,    0,    0,    0,    0,    0,    0,     1e-9,  0,     0,    0,    0,
+                                  0,    0,    0,    0,    0,    0,    0,    0,    0,    0,     0,     1e-9,  0,    0,    0,
+                                  0,    0,    0,    0,    0,    0,    0,    0,    0,    0,     0,     0,     1e-9, 0,    0,
+                                  0,    0,    0,    0,    0,    0,    0,    0,    0,    0,     0,     0,     0,    1e-9, 0,
+                                  0,    0,    0,    0,    0,    0,    0,    0,    0,    0,     0,     0,     0,    0,    1e-9]

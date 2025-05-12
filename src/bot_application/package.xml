@@ -3,10 +3,11 @@
 <package format="3">
   <name>bot_application</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>导航和位姿控制应用</description>
   <maintainer email="cat@todo.todo">cat</maintainer>
   <license>Apache-2.0</license>
 
+  <!-- 基本依赖 -->
   <depend>ament_index_python</depend>
   <depend>rclpy</depend>
   <depend>geometry_msgs</depend>
@@ -17,11 +18,18 @@
   <depend>builtin_interfaces</depend>
   <depend>diff_drive_msgs</depend>
   
+  <!-- 导航相关依赖 -->
+  <depend>nav2_simple_commander</depend>
+  <depend>tf2_geometry_msgs</depend>
+  <depend>sqlite3</depend>
+  
+  <!-- 构建工具依赖 -->
   <buildtool_depend>ament_python</buildtool_depend>
   <buildtool_depend>rosidl_default_generators</buildtool_depend>
   <exec_depend>rosidl_default_runtime</exec_depend>
   <member_of_group>rosidl_interface_packages</member_of_group>
 
+  <!-- 测试依赖 -->
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
   <test_depend>ament_pep257</test_depend>
