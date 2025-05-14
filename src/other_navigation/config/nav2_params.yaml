@@ -143,7 +143,7 @@ controller_server:
       debug_trajectory_details: True
       min_vel_x: 0.0
       min_vel_y: 0.0
-      max_vel_x: 0.5
+      max_vel_x: 1.0
       max_vel_y: 0.0
       max_vel_theta: 1.0
       min_speed_xy: 0.0
@@ -169,7 +169,7 @@ controller_server:
       short_circuit_trajectory_evaluation: True
       stateful: True
       critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]
-      BaseObstacle.scale: 0.04
+      BaseObstacle.scale: 0.08
       PathAlign.scale: 50.0
       PathAlign.forward_point_distance: 0.1
       GoalAlign.scale: 30.0
@@ -192,7 +192,7 @@ local_costmap:
       width: 3
       height: 3
       resolution: 0.025
-      robot_radius: 0.15
+      robot_radius: 0.23
       plugins: ["voxel_layer", "inflation_layer"]
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
@@ -231,7 +231,7 @@ global_costmap:
       global_frame: map
       robot_base_frame: base_link
       use_sim_time: True
-      robot_radius: 0.15
+      robot_radius: 0.23
       resolution: 0.025
       track_unknown_space: true
       plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
